@@ -1,17 +1,28 @@
 import os
 import random
 import logging
-
-from telegram import Update, File
+from flask import Flask, send_file
+from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters
-
 from keep_alive import keep_alive  # Import the keep_alive function
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
 
+# Initialize Flask app
+app = Flask(__name__)
+
 # Dictionary to store user states
 user_states = {}
+
+@app.route('/logs', methods=['GET'])
+def get_logs():
+    """Endpoint to download the chat logs."""
+    log_path = 'chatlog.txt'
+    if os.path.exists(log_path):
+        return send_file(log_path, as_attachment=True)
+    else:
+        return "Log file not found.", 404
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Welcomes users and guides them to start chatting."""
@@ -112,6 +123,13 @@ def main() -> None:
     application.add_handler(MessageHandler(filters.ALL & ~filters.COMMAND, message_handler))  # Handle all non-command messages
 
     keep_alive()  # Start the keep_alive server
+
+    # Run Flask app in a separate thread
+    from threading import Thread
+    thread = Thread(target=lambda: app.run(host="0.0.0.0", port=8080))
+    thread.start()
+
+    # Start the bot
     application.run_polling()
 
 if __name__ == '__main__':
